@@ -1,0 +1,4 @@
+pandas==2.1.4
+numpy==1.26.4
+faker==22.0.0
+azure-eventhub==5.11.5
