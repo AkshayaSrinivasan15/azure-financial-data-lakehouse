@@ -17,7 +17,7 @@ End-to-end enterprise data engineering platform built on Microsoft Azure, implem
 
 ```
 
-<img width="1800" height="1920" alt="image" src="https://github.com/user-attachments/assets/47e6f3b0-49ae-4f63-b16d-575c04359510" />
+![Architecture Diagram](docs/architecture.png)
 
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                          DATA SOURCES                                   │
