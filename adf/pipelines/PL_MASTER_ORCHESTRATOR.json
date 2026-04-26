@@ -1,0 +1,164 @@
+{
+    "name": "PL_MASTER_ORCHESTRATOR",
+    "properties": {
+        "activities": [
+            {
+                "name": "LOOKUP_PipelineConfig",
+                "type": "Lookup",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "DelimitedTextSource",
+                        "storeSettings": {
+                            "type": "AzureBlobFSReadSettings",
+                            "recursive": true,
+                            "enablePartitionDiscovery": false
+                        },
+                        "formatSettings": {
+                            "type": "DelimitedTextReadSettings"
+                        }
+                    },
+                    "dataset": {
+                        "referenceName": "DS_ADLS_Bronze_CSV",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "containerName": "configs",
+                            "folderPath": "configs",
+                            "fileName": "pipeline_config.csv"
+                        }
+                    },
+                    "firstRowOnly": false
+                }
+            },
+            {
+                "name": "FOREACH_Source",
+                "type": "ForEach",
+                "dependsOn": [
+                    {
+                        "activity": "LOOKUP_PipelineConfig",
+                        "dependencyConditions": [
+                            "Completed"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "items": {
+                        "value": "@activity('LOOKUP_PipelineConfig').output.value",
+                        "type": "Expression"
+                    },
+                    "isSequential": true,
+                    "activities": [
+                        {
+                            "name": "SWITCH_SourceType",
+                            "type": "Switch",
+                            "dependsOn": [],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "on": {
+                                    "value": "@item().source_type",
+                                    "type": "Expression"
+                                },
+                                "cases": [
+                                    {
+                                        "value": "AzureSQL",
+                                        "activities": [
+                                            {
+                                                "name": "EXEC_IngestFromSQL",
+                                                "type": "ExecutePipeline",
+                                                "dependsOn": [],
+                                                "policy": {
+                                                    "secureInput": false
+                                                },
+                                                "userProperties": [],
+                                                "typeProperties": {
+                                                    "pipeline": {
+                                                        "referenceName": "PL_INGEST_SQL_TO_BRONZE",
+                                                        "type": "PipelineReference"
+                                                    },
+                                                    "waitOnCompletion": true,
+                                                    "parameters": {
+                                                        "sourceTable": {
+                                                            "value": "@item().source_table_or_file",
+                                                            "type": "Expression"
+                                                        },
+                                                        "targetFolder": {
+                                                            "value": "@item().target_folder",
+                                                            "type": "Expression"
+                                                        },
+                                                        "loadType": {
+                                                            "value": "@item().load_type",
+                                                            "type": "Expression"
+                                                        },
+                                                        "watermarkCol": {
+                                                            "value": "@item().watermark_column",
+                                                            "type": "Expression"
+                                                        },
+                                                        "batchDate": {
+                                                            "value": "@utcNow()",
+                                                            "type": "Expression"
+                                                        },
+                                                        "targetContainer": {
+                                                            "value": "@item().target_container",
+                                                            "type": "Expression"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "value": "ADLS_CSV",
+                                        "activities": [
+                                            {
+                                                "name": "EXEC_IngestCSV",
+                                                "type": "ExecutePipeline",
+                                                "dependsOn": [],
+                                                "policy": {
+                                                    "secureInput": false
+                                                },
+                                                "userProperties": [],
+                                                "typeProperties": {
+                                                    "pipeline": {
+                                                        "referenceName": "PL_INGEST_CSV_TO_BRONZE",
+                                                        "type": "PipelineReference"
+                                                    },
+                                                    "waitOnCompletion": true,
+                                                    "parameters": {
+                                                        "containerName": {
+                                                            "value": "@item().target_container",
+                                                            "type": "Expression"
+                                                        },
+                                                        "folderPath": {
+                                                            "value": "@item().target_folder",
+                                                            "type": "Expression"
+                                                        },
+                                                        "fileName": {
+                                                            "value": "@item().source_table_or_file",
+                                                            "type": "Expression"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }
+        ],
+        "annotations": [],
+        "lastPublishTime": "2026-04-19T07:59:20Z"
+    },
+    "type": "Microsoft.DataFactory/factories/pipelines"
+}

@@ -1,0 +1,341 @@
+{
+    "name": "PL_INGEST_SQL_TO_BRONZE",
+    "properties": {
+        "activities": [
+            {
+                "name": "LOOKUP_LastWatermark",
+                "type": "Lookup",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "AzureSqlSource",
+                        "sqlReaderQuery": {
+                            "value": "@concat(\n'SELECT ISNULL(MAX(last_watermark), ''1900-01-01 00:00:00'') AS last_watermark FROM dbo.pipeline_watermark WHERE source_table = ''',\npipeline().parameters.sourceTable,\n''' AND is_active = 1'\n)",
+                            "type": "Expression"
+                        },
+                        "queryTimeout": "02:00:00",
+                        "partitionOption": "None"
+                    },
+                    "dataset": {
+                        "referenceName": "DS_AZURESQL_SOURCE",
+                        "type": "DatasetReference"
+                    }
+                }
+            },
+            {
+                "name": "SET_LastWatermark",
+                "type": "SetVariable",
+                "dependsOn": [
+                    {
+                        "activity": "LOOKUP_LastWatermark",
+                        "dependencyConditions": [
+                            "Completed"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "variableName": "lastWatermark",
+                    "value": {
+                        "value": "@activity('LOOKUP_LastWatermark').output.firstRow.last_watermark",
+                        "type": "Expression"
+                    }
+                }
+            },
+            {
+                "name": "IF_IncrementalOrFull",
+                "type": "IfCondition",
+                "dependsOn": [
+                    {
+                        "activity": "SET_LastWatermark",
+                        "dependencyConditions": [
+                            "Completed"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "expression": {
+                        "value": "@equals(pipeline().parameters.loadType, 'incremental')",
+                        "type": "Expression"
+                    },
+                    "ifFalseActivities": [
+                        {
+                            "name": "COPY_FullSQL",
+                            "type": "Copy",
+                            "dependsOn": [],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "source": {
+                                    "type": "AzureSqlSource",
+                                    "sqlReaderQuery": {
+                                        "value": "@concat(\n'SELECT *, ''',\npipeline().parameters.batchDate,\n''' AS batch_date, GETUTCDATE() AS ingestion_ts, ''ADF_FULL'' AS load_type FROM ',\npipeline().parameters.sourceTable\n)",
+                                        "type": "Expression"
+                                    },
+                                    "queryTimeout": "02:00:00",
+                                    "partitionOption": "None"
+                                },
+                                "sink": {
+                                    "type": "DelimitedTextSink",
+                                    "storeSettings": {
+                                        "type": "AzureBlobFSWriteSettings"
+                                    },
+                                    "formatSettings": {
+                                        "type": "DelimitedTextWriteSettings",
+                                        "quoteAllText": true,
+                                        "fileExtension": ".txt"
+                                    }
+                                },
+                                "enableStaging": false,
+                                "translator": {
+                                    "type": "TabularTranslator",
+                                    "typeConversion": true,
+                                    "typeConversionSettings": {
+                                        "allowDataTruncation": true,
+                                        "treatBooleanAsNumber": false
+                                    }
+                                }
+                            },
+                            "inputs": [
+                                {
+                                    "referenceName": "DS_AZURESQL_SOURCE",
+                                    "type": "DatasetReference"
+                                }
+                            ],
+                            "outputs": [
+                                {
+                                    "referenceName": "DS_ADLS_Bronze_CSV",
+                                    "type": "DatasetReference",
+                                    "parameters": {
+                                        "containerName": "@pipeline().parameters.targetContainer",
+                                        "folderPath": "@pipeline().parameters.targetFolder",
+                                        "fileName": "@concat(pipeline().parameters.sourceTable, '_', pipeline().parameters.batchDate, '.csv')"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "SET_RowsCopied_Full",
+                            "type": "SetVariable",
+                            "dependsOn": [
+                                {
+                                    "activity": "COPY_FullSQL",
+                                    "dependencyConditions": [
+                                        "Succeeded"
+                                    ]
+                                }
+                            ],
+                            "policy": {
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "variableName": "rowsCopied",
+                                "value": {
+                                    "value": "@activity('COPY_FullSQL').output.rowsCopied",
+                                    "type": "Expression"
+                                }
+                            }
+                        }
+                    ],
+                    "ifTrueActivities": [
+                        {
+                            "name": "COPY_IncrementalSQL",
+                            "type": "Copy",
+                            "dependsOn": [],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "source": {
+                                    "type": "AzureSqlSource",
+                                    "sqlReaderQuery": {
+                                        "value": "@concat(\n'SELECT *, ''',\npipeline().parameters.batchDate,\n''' AS batch_date, GETUTCDATE() AS ingestion_ts, ''ADF_INCREMENTAL'' AS load_type FROM ',\npipeline().parameters.sourceTable,\n' WHERE ',\npipeline().parameters.watermarkCol,\n' > ''',\nvariables('lastWatermark'),\n''' AND ',\npipeline().parameters.watermarkCol,\n' <= GETUTCDATE()'\n)",
+                                        "type": "Expression"
+                                    },
+                                    "queryTimeout": "02:00:00",
+                                    "partitionOption": "None"
+                                },
+                                "sink": {
+                                    "type": "DelimitedTextSink",
+                                    "storeSettings": {
+                                        "type": "AzureBlobFSWriteSettings"
+                                    },
+                                    "formatSettings": {
+                                        "type": "DelimitedTextWriteSettings",
+                                        "quoteAllText": true,
+                                        "fileExtension": ".txt"
+                                    }
+                                },
+                                "enableStaging": false,
+                                "translator": {
+                                    "type": "TabularTranslator",
+                                    "typeConversion": true,
+                                    "typeConversionSettings": {
+                                        "allowDataTruncation": true,
+                                        "treatBooleanAsNumber": false
+                                    }
+                                }
+                            },
+                            "inputs": [
+                                {
+                                    "referenceName": "DS_AZURESQL_SOURCE",
+                                    "type": "DatasetReference"
+                                }
+                            ],
+                            "outputs": [
+                                {
+                                    "referenceName": "DS_ADLS_Bronze_CSV",
+                                    "type": "DatasetReference",
+                                    "parameters": {
+                                        "containerName": "@pipeline().parameters.targetContainer",
+                                        "folderPath": "@pipeline().parameters.targetFolder",
+                                        "fileName": "@concat(pipeline().parameters.sourceTable, '_', pipeline().parameters.batchDate, '.csv')"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "SET_RowsCopied_Incremental",
+                            "type": "SetVariable",
+                            "dependsOn": [
+                                {
+                                    "activity": "COPY_IncrementalSQL",
+                                    "dependencyConditions": [
+                                        "Succeeded"
+                                    ]
+                                }
+                            ],
+                            "policy": {
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "variableName": "rowsCopied",
+                                "value": {
+                                    "value": "@activity('COPY_IncrementalSQL').output.rowsCopied",
+                                    "type": "Expression"
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "UPDATE_Watermark",
+                "type": "SqlServerStoredProcedure",
+                "dependsOn": [
+                    {
+                        "activity": "IF_IncrementalOrFull",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "storedProcedureName": "[dbo].[usp_UpdateWatermark]",
+                    "storedProcedureParameters": {
+                        "lastWatermark": {
+                            "value": {
+                                "value": "@utcNow()",
+                                "type": "Expression"
+                            },
+                            "type": "DateTime"
+                        },
+                        "pipelineRunId": {
+                            "value": {
+                                "value": "@pipeline().RunId",
+                                "type": "Expression"
+                            },
+                            "type": "String"
+                        },
+                        "rowsCopied": {
+                            "value": {
+                                "value": "@variables('rowsCopied')",
+                                "type": "Expression"
+                            },
+                            "type": "Int32"
+                        },
+                        "sourceTable": {
+                            "value": {
+                                "value": "@pipeline().parameters.sourceTable",
+                                "type": "Expression"
+                            },
+                            "type": "String"
+                        }
+                    }
+                },
+                "linkedServiceName": {
+                    "referenceName": "LS_AZURE_SQL",
+                    "type": "LinkedServiceReference"
+                }
+            }
+        ],
+        "parameters": {
+            "sourceTable": {
+                "type": "string"
+            },
+            "targetFolder": {
+                "type": "string"
+            },
+            "loadType": {
+                "type": "string"
+            },
+            "watermarkCol": {
+                "type": "string"
+            },
+            "batchDate": {
+                "type": "string"
+            },
+            "targetContainer": {
+                "type": "string"
+            }
+        },
+        "variables": {
+            "lastWatermark": {
+                "type": "String",
+                "defaultValue": "1900-01-01 00:00:00"
+            },
+            "rowsCopied": {
+                "type": "Integer"
+            }
+        },
+        "annotations": [],
+        "lastPublishTime": "2026-04-19T07:59:19Z"
+    },
+    "type": "Microsoft.DataFactory/factories/pipelines"
+}
