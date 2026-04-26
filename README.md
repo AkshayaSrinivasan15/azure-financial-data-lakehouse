@@ -228,13 +228,13 @@ Batch pipelines guarantee correctness (reprocessable, auditable). Streaming adds
 
 ## Azure Resources Used
 | Resource 
-|---|---|---|
-| Azure Data Lake Storage Gen2 | Bronze / Silver / Gold containers |
-| Azure Data Factory | All ingestion pipelines |
-| Databricks Community Edition | All PySpark notebooks |
-| Azure SQL Database | OLTP source + watermark tables |
-| Azure Key Vault | All secrets and connection strings |
-| Azure Monitor |  Pipeline alerting |
+|---|
+| Azure Data Lake Storage Gen2
+| Azure Data Factory 
+| Databricks Community Edition 
+| Azure SQL Database 
+| Azure Key Vault 
+| Azure Monitor
 ---
 
 
@@ -263,9 +263,6 @@ bash run_all_generators.sh
 # 5. Deploy ADF pipelines
 # ADF Studio → Import linked services → datasets → pipelines → trigger
 
-# 6. Deploy infrastructure (optional)
-cd infra
-terraform init && terraform plan && terraform apply
 ```
 
 ---
