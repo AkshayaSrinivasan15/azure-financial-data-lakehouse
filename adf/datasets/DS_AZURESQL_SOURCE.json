@@ -1,0 +1,103 @@
+{
+    "name": "DS_AZURESQL_SOURCE",
+    "properties": {
+        "linkedServiceName": {
+            "referenceName": "LS_AZURE_SQL",
+            "type": "LinkedServiceReference"
+        },
+        "annotations": [],
+        "type": "AzureSqlTable",
+        "schema": [
+            {
+                "name": "customer_id",
+                "type": "varchar"
+            },
+            {
+                "name": "full_name",
+                "type": "varchar"
+            },
+            {
+                "name": "email",
+                "type": "varchar"
+            },
+            {
+                "name": "phone",
+                "type": "varchar"
+            },
+            {
+                "name": "date_of_birth",
+                "type": "date"
+            },
+            {
+                "name": "country",
+                "type": "varchar"
+            },
+            {
+                "name": "country_code",
+                "type": "char"
+            },
+            {
+                "name": "city",
+                "type": "varchar"
+            },
+            {
+                "name": "segment",
+                "type": "varchar"
+            },
+            {
+                "name": "risk_rating",
+                "type": "varchar"
+            },
+            {
+                "name": "kyc_status",
+                "type": "varchar"
+            },
+            {
+                "name": "kyc_verified_date",
+                "type": "date"
+            },
+            {
+                "name": "kyc_expiry_date",
+                "type": "date"
+            },
+            {
+                "name": "onboarding_date",
+                "type": "date"
+            },
+            {
+                "name": "credit_score",
+                "type": "int",
+                "precision": 10
+            },
+            {
+                "name": "annual_income_usd",
+                "type": "decimal",
+                "precision": 15,
+                "scale": 2
+            },
+            {
+                "name": "is_active",
+                "type": "bit"
+            },
+            {
+                "name": "created_at",
+                "type": "datetime2",
+                "scale": 7
+            },
+            {
+                "name": "updated_at",
+                "type": "datetime2",
+                "scale": 7
+            },
+            {
+                "name": "source_system",
+                "type": "varchar"
+            }
+        ],
+        "typeProperties": {
+            "schema": "dbo",
+            "table": "customers"
+        }
+    },
+    "type": "Microsoft.DataFactory/factories/datasets"
+}
