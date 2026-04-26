@@ -19,6 +19,7 @@ End-to-end enterprise data engineering platform built on Microsoft Azure, implem
 
 ![Architecture Diagram](docs/architecture_phase5.png)
 
+```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                          DATA SOURCES                                   │
 │                                                                         │
