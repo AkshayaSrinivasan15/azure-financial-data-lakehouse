@@ -15,7 +15,7 @@ End-to-end enterprise data engineering platform built on Microsoft Azure, implem
 
 ## Architecture
 
-```
+
 
 ![Architecture Diagram](docs/architecture_phase5.png)
 
